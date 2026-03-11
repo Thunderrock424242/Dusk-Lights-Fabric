@@ -50,4 +50,3 @@ tasks.register('net.neoforged.devlaunch.Main.main()') {
     description = 'Alias to :forge:runClient for misconfigured IDE Gradle run configurations.'
     dependsOn(':forge:runClient')
 }
-/// ./gradlew :forge:runClient
