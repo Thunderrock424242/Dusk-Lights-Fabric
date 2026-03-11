@@ -15,7 +15,9 @@ out
 
 # gradle
 build
+**/build
 .gradle
+.architectury-transformer
 
 # other
 eclipse
