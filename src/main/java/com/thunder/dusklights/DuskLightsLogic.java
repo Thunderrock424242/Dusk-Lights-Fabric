@@ -183,12 +183,20 @@ public final class DuskLightsLogic {
     }
 
     private static void applyBrightness(ServerLevel level, BlockPos pos, BlockState state, int brightness) {
-        BlockState normalizedState = normalizeControllableTorchState(state);
-        BlockState updatedState = tryApplyLightLevel(normalizedState, brightness);
+        BlockState updatedState = tryApplyLightLevel(state, brightness);
 
         if (updatedState != state) {
             level.setBlock(pos, updatedState, Block.UPDATE_CLIENTS);
             return;
+        }
+
+        BlockState normalizedVanillaTorchState = normalizeVanillaTorchState(state);
+        if (normalizedVanillaTorchState != state) {
+            BlockState normalizedUpdatedState = tryApplyLightLevel(normalizedVanillaTorchState, brightness);
+            if (normalizedUpdatedState != normalizedVanillaTorchState) {
+                level.setBlock(pos, normalizedUpdatedState, Block.UPDATE_CLIENTS);
+                return;
+            }
         }
 
         BlockPos lightPos = pos.above();
@@ -204,9 +212,7 @@ public final class DuskLightsLogic {
             level.setBlock(lightPos, Blocks.LIGHT.defaultBlockState().setValue(LightBlock.LEVEL, brightness), Block.UPDATE_CLIENTS);
         }
     }
-
-
-    private static BlockState normalizeControllableTorchState(BlockState state) {
+    private static BlockState normalizeVanillaTorchState(BlockState state) {
         if (state.is(Blocks.TORCH)) {
             return Blocks.REDSTONE_TORCH.defaultBlockState();
         }
