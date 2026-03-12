@@ -14,11 +14,11 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LightBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 public final class DuskLightsLogic {
@@ -28,6 +28,10 @@ public final class DuskLightsLogic {
     private static final int UPDATE_INTERVAL_TICKS = 5;
 
     private DuskLightsLogic() {
+    }
+
+    public static TagKey<Block> daylightLinkableTag() {
+        return DAYLIGHT_LINKABLE;
     }
 
     public static void handleLightLinkUse(ServerLevel level, Player player, InteractionHand hand, BlockPos pos) {
@@ -63,11 +67,10 @@ public final class DuskLightsLogic {
         }
 
         int brightness = calculateBrightness(level);
-        Iterator<Long> iterator = data.getLinkedLightPositions().iterator();
         List<BlockPos> stalePositions = new ArrayList<>();
 
-        while (iterator.hasNext()) {
-            BlockPos pos = BlockPos.of(iterator.next());
+        for (Long packed : data.getLinkedLightPositions()) {
+            BlockPos pos = BlockPos.of(packed);
             if (!level.isLoaded(pos)) {
                 continue;
             }
@@ -87,7 +90,11 @@ public final class DuskLightsLogic {
         }
     }
 
-    public static void handleChunkLoad(ServerLevel level, ChunkPos chunkPos) {
+    public static void handleChunkLoad(ServerLevel level, ChunkPos chunkPos, boolean newlyGeneratedChunk) {
+        if (!newlyGeneratedChunk) {
+            return;
+        }
+
         LinkedLightsSavedData data = LinkedLightsSavedData.get(level);
         if (!data.markChunkScanned(chunkPos.toLong())) {
             return;
@@ -101,15 +108,14 @@ public final class DuskLightsLogic {
             for (int z = chunkPos.getMinBlockZ(); z <= chunkPos.getMaxBlockZ(); z++) {
                 for (int y = minY; y < maxY; y++) {
                     cursor.set(x, y, z);
-                    BlockState state = level.getBlockState(cursor);
-                    if (state.is(DAYLIGHT_LINKABLE)) {
+                    if (level.getBlockState(cursor).is(DAYLIGHT_LINKABLE)) {
                         data.addLinked(cursor.immutable());
                     }
                 }
             }
         }
 
-        DuskLights.LOGGER.debug("Scanned chunk {} for natural linkable lights", chunkPos);
+        DuskLights.LOGGER.debug("Scanned newly generated chunk {} for natural linkable lights", chunkPos);
     }
 
     private static int calculateBrightness(Level level) {
@@ -125,21 +131,20 @@ public final class DuskLightsLogic {
 
         if (updatedState != state) {
             level.setBlock(pos, updatedState, Block.UPDATE_CLIENTS);
+            return;
         }
 
-        if (updatedState == state) {
-            BlockPos lightPos = pos.above();
-            if (brightness <= 0) {
-                if (level.getBlockState(lightPos).is(Blocks.LIGHT)) {
-                    level.removeBlock(lightPos, false);
-                }
-                return;
+        BlockPos lightPos = pos.above();
+        if (brightness <= 0) {
+            if (level.getBlockState(lightPos).is(Blocks.LIGHT)) {
+                level.removeBlock(lightPos, false);
             }
+            return;
+        }
 
-            BlockState lightState = level.getBlockState(lightPos);
-            if (lightState.isAir() || lightState.is(Blocks.LIGHT)) {
-                level.setBlock(lightPos, Blocks.LIGHT.defaultBlockState().setValue(net.minecraft.world.level.block.LightBlock.LEVEL, brightness), Block.UPDATE_CLIENTS);
-            }
+        BlockState lightState = level.getBlockState(lightPos);
+        if (lightState.isAir() || lightState.is(Blocks.LIGHT)) {
+            level.setBlock(lightPos, Blocks.LIGHT.defaultBlockState().setValue(LightBlock.LEVEL, brightness), Block.UPDATE_CLIENTS);
         }
     }
 
@@ -149,16 +154,14 @@ public final class DuskLightsLogic {
                 continue;
             }
 
-            String propertyName = integerProperty.getName();
-            boolean seemsLikeLightProperty = propertyName.contains("light") || propertyName.contains("level") || propertyName.contains("power");
-            if (!seemsLikeLightProperty) {
+            String name = integerProperty.getName();
+            if (!(name.contains("light") || name.contains("level") || name.contains("power"))) {
                 continue;
             }
 
-            int minValue = integerProperty.getPossibleValues().stream().min(Integer::compareTo).orElse(0);
-            int maxValue = integerProperty.getPossibleValues().stream().max(Integer::compareTo).orElse(15);
-            int clamped = Math.max(minValue, Math.min(maxValue, brightness));
-            return state.setValue(integerProperty, clamped);
+            int min = integerProperty.getPossibleValues().stream().min(Integer::compareTo).orElse(0);
+            int max = integerProperty.getPossibleValues().stream().max(Integer::compareTo).orElse(15);
+            return state.setValue(integerProperty, Math.max(min, Math.min(max, brightness)));
         }
 
         return state;

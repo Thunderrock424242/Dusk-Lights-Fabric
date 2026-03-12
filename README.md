@@ -9,8 +9,8 @@ DuskLights adds immersive, automated lighting to Minecraft while keeping a vanil
 - Villages and naturally generated buildings that spawn with torches/lanterns should be considered auto-linked by default.
 - Player-built structures require intentional setup:
   - either right-click placed lights with a Daylight Sensor,
-  - or craft a "sensor-linked" version of the light from the original light + Daylight Sensor.
-- The system is intended to be data-driven so it can support **modded light blocks** (not only vanilla torches/lanterns).
+  - or craft a sensor-linked copy (currently implemented as `Linked Torch`: `Torch + Daylight Sensor`).
+- The system is data-driven so modded light blocks can opt in via `dusklights:daylight_linkable`.
 
 ## Design goals
 

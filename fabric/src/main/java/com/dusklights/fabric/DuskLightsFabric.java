@@ -25,6 +25,9 @@ public final class DuskLightsFabric implements ModInitializer {
 
         ServerTickEvents.END_WORLD_TICK.register(DuskLightsLogic::tickServerLevel);
 
-        ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> DuskLightsLogic.handleChunkLoad(world, chunk.getPos()));
+        ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
+            boolean newlyGenerated = chunk.getInhabitedTime() == 0L;
+            DuskLightsLogic.handleChunkLoad(world, chunk.getPos(), newlyGenerated);
+        });
     }
 }
