@@ -1,4 +1,4 @@
-package com.dusklights;
+package com.thunder.dusklights;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
