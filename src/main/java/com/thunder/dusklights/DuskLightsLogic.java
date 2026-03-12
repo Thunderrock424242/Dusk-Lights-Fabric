@@ -6,10 +6,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -34,26 +31,27 @@ public final class DuskLightsLogic {
         return DAYLIGHT_LINKABLE;
     }
 
-    public static void handleLightLinkUse(ServerLevel level, Player player, InteractionHand hand, BlockPos pos) {
-        ItemStack stack = player.getItemInHand(hand);
-        if (!stack.is(Items.DAYLIGHT_DETECTOR)) {
-            return;
+    public static boolean handleLightLinkUse(ServerLevel level, Player player, BlockPos pos) {
+        if (!player.isShiftKeyDown()) {
+            return false;
         }
 
         BlockState state = level.getBlockState(pos);
         if (!state.is(DAYLIGHT_LINKABLE)) {
-            return;
+            return false;
         }
 
         LinkedLightsSavedData data = LinkedLightsSavedData.get(level);
         boolean linked = data.toggleLinked(pos.immutable());
 
         if (linked) {
-            player.displayClientMessage(Component.translatable("message.dusklights.linked"), true);
+            player.displayClientMessage(Component.translatable("message.dusklights.linked_shift"), true);
         } else {
             removeAuxiliaryLight(level, pos);
             player.displayClientMessage(Component.translatable("message.dusklights.unlinked"), true);
         }
+
+        return true;
     }
 
     public static void tickServerLevel(ServerLevel level) {
@@ -119,11 +117,52 @@ public final class DuskLightsLogic {
     }
 
     private static int calculateBrightness(Level level) {
-        float angle = level.getTimeOfDay(1.0F);
-        float cos = (float) Math.cos(angle * (Math.PI * 2));
-        float normalizedNight = (1.0F - cos) * 0.5F;
-        float smooth = normalizedNight * normalizedNight * (3.0F - 2.0F * normalizedNight);
-        return Math.max(0, Math.min(15, Math.round(smooth * 15.0F)));
+        DuskLightsConfig.Values config = DuskLightsConfig.get();
+
+        int timeOfDay = (int) (level.getDayTime() % 24000L);
+        int sunsetDurationTicks = minutesToTicks(config.sunsetRampMinutes);
+        int sunriseDurationTicks = minutesToTicks(config.sunriseRampMinutes);
+
+        int sunsetStart = config.sunsetStartTick;
+        int sunsetEnd = Math.min(23999, sunsetStart + sunsetDurationTicks);
+
+        int sunriseStart = config.sunriseStartTick;
+        int sunriseEnd = Math.min(23999, sunriseStart + sunriseDurationTicks);
+
+        float minAtSunset = config.sunsetMinimumBrightness / 15.0F;
+        float brightness;
+
+        if (timeOfDay < sunsetStart || timeOfDay > sunriseEnd) {
+            brightness = 0.0F;
+        } else if (timeOfDay <= sunsetEnd) {
+            float progress = normalizedProgress(timeOfDay, sunsetStart, sunsetEnd);
+            float eased = smoothstep(progress);
+            brightness = minAtSunset + (1.0F - minAtSunset) * eased;
+        } else if (timeOfDay < sunriseStart) {
+            brightness = 1.0F;
+        } else {
+            float progress = normalizedProgress(timeOfDay, sunriseStart, sunriseEnd);
+            float eased = smoothstep(progress);
+            brightness = 1.0F - eased;
+        }
+
+        return Math.max(0, Math.min(15, Math.round(brightness * 15.0F)));
+    }
+
+    private static float normalizedProgress(int value, int start, int end) {
+        if (end <= start) {
+            return 1.0F;
+        }
+        return Math.max(0.0F, Math.min(1.0F, (value - start) / (float) (end - start)));
+    }
+
+    private static int minutesToTicks(double minutes) {
+        return Math.max(1, (int) Math.round(minutes * 60.0D * 20.0D));
+    }
+
+    private static float smoothstep(float value) {
+        float clamped = Math.max(0.0F, Math.min(1.0F, value));
+        return clamped * clamped * (3.0F - 2.0F * clamped);
     }
 
     private static void applyBrightness(ServerLevel level, BlockPos pos, BlockState state, int brightness) {
