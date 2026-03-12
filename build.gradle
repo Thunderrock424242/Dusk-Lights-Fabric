@@ -44,10 +44,10 @@ dependencies {
 processResources {
     def resourceProperties = [
             version              : project.version,
-            mod_id               : project.findProperty("mod_id") ?: project.archives_base_name,
-            mod_name             : project.findProperty("mod_name") ?: project.archives_base_name,
+            mod_id               : project.findProperty("dusklights") ?: project.archives_base_name,
+            mod_name             : project.findProperty("Dusk Lights") ?: project.archives_base_name,
             mod_description      : project.findProperty("mod_description") ?: "",
-            mod_authors          : project.findProperty("mod_authors") ?: "",
+            mod_authors          : project.findProperty("thunderrock424242") ?: "",
             mod_license          : project.findProperty("mod_license") ?: "All Rights Reserved",
             fabric_loader_version: project.loader_version
     ]
