@@ -1,5 +1,7 @@
 package com.thunder.dusklights;
 
+import com.thunder.dusklights.api.DuskLightsCompatApi;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
