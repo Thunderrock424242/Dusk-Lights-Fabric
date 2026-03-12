@@ -1,5 +1,7 @@
 package com.thunder.dusklights;
 
+import com.thunder.dusklights.api.DuskLightsCompatApi;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -183,6 +185,10 @@ public final class DuskLightsLogic {
     }
 
     private static void applyBrightness(ServerLevel level, BlockPos pos, BlockState state, int brightness) {
+        if (DuskLightsCompatApi.applyRegisteredHandlers(level, pos, state, brightness)) {
+            return;
+        }
+
         BlockState normalizedState = normalizeControllableTorchState(state);
         BlockState updatedState = tryApplyLightLevel(normalizedState, brightness);
 

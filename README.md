@@ -16,6 +16,7 @@ DuskLights adds immersive, automated lighting to Minecraft while keeping a vanil
 
 - `src/main/java` - Fabric mod code.
 - `src/main/resources` - Fabric metadata, assets, recipes, and tags.
+- Compatibility API docs for mod developers: `docs/MOD_COMPAT_API.md`.
 
 ## Useful Gradle tasks
 
