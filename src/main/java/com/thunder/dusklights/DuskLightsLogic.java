@@ -51,28 +51,33 @@ public final class DuskLightsLogic {
             return;
         }
 
-        int brightness = calculateBrightness(level);
         List<BlockPos> stalePositions = new ArrayList<>();
 
         for (Long packed : data.getLinkedLightPositions()) {
             BlockPos pos = BlockPos.of(packed);
-            if (!level.isLoaded(pos)) {
-                continue;
-            }
-
-            BlockState state = level.getBlockState(pos);
-            if (!isLinkableState(state)) {
+            if (!refreshLinkedLight(level, pos)) {
                 stalePositions.add(pos);
-                removeAuxiliaryLight(level, pos);
-                continue;
             }
-
-            applyBrightness(level, pos, state, brightness);
         }
 
         for (BlockPos stalePos : stalePositions) {
             data.removeLinked(stalePos);
         }
+    }
+
+    public static boolean refreshLinkedLight(ServerLevel level, BlockPos pos) {
+        if (!level.isLoaded(pos)) {
+            return true;
+        }
+
+        BlockState state = level.getBlockState(pos);
+        if (!isLinkableState(state)) {
+            removeAuxiliaryLight(level, pos);
+            return false;
+        }
+
+        applyBrightness(level, pos, state, calculateBrightness(level));
+        return true;
     }
 
     public static void handleChunkLoad(ServerLevel level, ChunkPos chunkPos) {

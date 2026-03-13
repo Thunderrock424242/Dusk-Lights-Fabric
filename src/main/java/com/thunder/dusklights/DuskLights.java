@@ -107,7 +107,9 @@ public final class DuskLights implements ModInitializer {
                     ? placeContext.getClickedPos()
                     : placeContext.getClickedPos().relative(placeContext.getClickedFace());
 
-            LinkedLightsSavedData.get(serverLevel).addLinked(placedPos.immutable());
+            net.minecraft.core.BlockPos linkedPos = placedPos.immutable();
+            LinkedLightsSavedData.get(serverLevel).addLinked(linkedPos);
+            DuskLightsLogic.refreshLinkedLight(serverLevel, linkedPos);
             return InteractionResult.PASS;
         });
         ServerChunkEvents.CHUNK_LOAD.register((level, chunk) -> DuskLightsLogic.handleChunkLoad(level, chunk.getPos()));
