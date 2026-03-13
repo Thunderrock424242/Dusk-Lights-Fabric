@@ -13,6 +13,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LightBlock;
+import net.minecraft.world.level.block.WallTorchBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
@@ -206,21 +207,53 @@ public final class DuskLightsLogic {
             }
         }
 
-        BlockPos lightPos = pos.above();
+        List<BlockPos> helperLightPositions = getHelperLightPositions(pos, state);
         if (brightness <= 0) {
-            if (level.getBlockState(lightPos).is(Blocks.LIGHT)) {
-                level.removeBlock(lightPos, false);
+            for (BlockPos helperPos : helperLightPositions) {
+                if (level.getBlockState(helperPos).is(Blocks.LIGHT)) {
+                    level.removeBlock(helperPos, false);
+                }
             }
             return;
         }
 
-        BlockState lightState = level.getBlockState(lightPos);
-        if (lightState.isAir() || lightState.is(Blocks.LIGHT)) {
-            level.setBlock(lightPos, Blocks.LIGHT.defaultBlockState().setValue(LightBlock.LEVEL, brightness), Block.UPDATE_CLIENTS);
+        BlockPos selectedPosition = null;
+        for (BlockPos helperPos : helperLightPositions) {
+            BlockState helperState = level.getBlockState(helperPos);
+            if (helperState.is(Blocks.LIGHT)) {
+                selectedPosition = helperPos;
+                break;
+            }
+
+            if (helperState.isAir() && selectedPosition == null) {
+                selectedPosition = helperPos;
+            }
+        }
+
+        if (selectedPosition != null) {
+            level.setBlock(selectedPosition, Blocks.LIGHT.defaultBlockState().setValue(LightBlock.LEVEL, brightness), Block.UPDATE_CLIENTS);
+
+            for (BlockPos helperPos : helperLightPositions) {
+                if (!helperPos.equals(selectedPosition) && level.getBlockState(helperPos).is(Blocks.LIGHT)) {
+                    level.removeBlock(helperPos, false);
+                }
+            }
             return;
         }
 
         logCompatFailure(state, pos, "Unable to apply brightness with fallback (blocked helper light position). Report to the owning mod for compatibility support.");
+    }
+
+    private static List<BlockPos> getHelperLightPositions(BlockPos sourcePos, BlockState sourceState) {
+        List<BlockPos> candidates = new ArrayList<>(3);
+
+        if (sourceState.hasProperty(WallTorchBlock.FACING)) {
+            candidates.add(sourcePos.relative(sourceState.getValue(WallTorchBlock.FACING)));
+        }
+
+        candidates.add(sourcePos.above());
+        candidates.add(sourcePos);
+        return candidates;
     }
 
     private static BlockState normalizeVanillaTorchState(BlockState state) {
@@ -270,9 +303,11 @@ public final class DuskLightsLogic {
     }
 
     private static void removeAuxiliaryLight(ServerLevel level, BlockPos sourcePos) {
-        BlockPos lightPos = sourcePos.above();
-        if (level.getBlockState(lightPos).is(Blocks.LIGHT)) {
-            level.removeBlock(lightPos, false);
+        BlockState sourceState = level.getBlockState(sourcePos);
+        for (BlockPos helperPos : getHelperLightPositions(sourcePos, sourceState)) {
+            if (level.getBlockState(helperPos).is(Blocks.LIGHT)) {
+                level.removeBlock(helperPos, false);
+            }
         }
     }
 }
