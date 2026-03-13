@@ -8,6 +8,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -31,6 +32,7 @@ public final class DuskLightsLogic {
     private static final int DAY_LENGTH_TICKS = 24000;
     private static final int CHUNK_SCANS_PER_TICK = 1;
     private static final Set<ResourceLocation> LOGGED_COMPAT_FAILURE_BLOCKS = ConcurrentHashMap.newKeySet();
+    private static final ThreadLocal<LightQueryContext> LIGHT_QUERY_CONTEXT = new ThreadLocal<>();
     private static Integer debugForcedBrightness;
 
     private DuskLightsLogic() {
@@ -132,8 +134,13 @@ public final class DuskLightsLogic {
     }
 
 
-    static boolean isLinkableState(BlockState state) {
-        return state.is(DAYLIGHT_LINKABLE) || AutoCompatDiscovery.isDiscoveredLinkable(state);
+    public static boolean isLinkableState(BlockState state) {
+        return (state.is(DAYLIGHT_LINKABLE) || AutoCompatDiscovery.isDiscoveredLinkable(state))
+                && supportsDayNightCycleControl(state);
+    }
+
+    private static boolean supportsDayNightCycleControl(BlockState state) {
+        return hasBrightnessControlProperty(state) || state.getLightEmission() <= 0;
     }
 
     public static void setDebugLightsEnabled(Boolean enabled) {
@@ -151,6 +158,32 @@ public final class DuskLightsLogic {
         }
 
         return debugForcedBrightness > 0 ? "on" : "off";
+    }
+
+
+    public static int getTargetBrightness(Level level) {
+        return calculateBrightness(level);
+    }
+
+    public static void pushLightQueryContext(BlockGetter getter, BlockPos pos) {
+        LIGHT_QUERY_CONTEXT.set(new LightQueryContext(getter, pos.immutable()));
+    }
+
+    public static void popLightQueryContext() {
+        LIGHT_QUERY_CONTEXT.remove();
+    }
+
+    public static Integer getForcedLightEmissionForLinkedState(BlockState state) {
+        LightQueryContext context = LIGHT_QUERY_CONTEXT.get();
+        if (context == null || !(context.getter() instanceof ServerLevel serverLevel)) {
+            return null;
+        }
+
+        if (!isLinkableState(state) || !LinkedLightsSavedData.get(serverLevel).isLinked(context.pos())) {
+            return null;
+        }
+
+        return getTargetBrightness(serverLevel);
     }
 
     private static int calculateBrightness(Level level) {
@@ -272,6 +305,10 @@ public final class DuskLightsLogic {
     }
 
     private static BlockState tryApplyLightLevel(BlockState state, int brightness) {
+        if (!hasBrightnessControlProperty(state)) {
+            return state;
+        }
+
         for (var property : state.getProperties()) {
             if (property instanceof IntegerProperty integerProperty) {
                 String name = integerProperty.getName();
@@ -292,6 +329,27 @@ public final class DuskLightsLogic {
         return state;
     }
 
+    private static boolean hasBrightnessControlProperty(BlockState state) {
+        for (var property : state.getProperties()) {
+            if (property instanceof IntegerProperty integerProperty) {
+                String name = integerProperty.getName();
+                if (name.contains("light") || name.contains("level") || name.contains("power")) {
+                    return true;
+                }
+                continue;
+            }
+
+            if (property instanceof BooleanProperty booleanProperty && "lit".equals(booleanProperty.getName())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+    private record LightQueryContext(BlockGetter getter, BlockPos pos) {
+    }
 
     private static void logCompatFailure(BlockState state, BlockPos pos, String reason) {
         ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
