@@ -3,14 +3,18 @@ package com.thunder.dusklights;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.TorchBlock;
+import net.minecraft.world.level.block.WallTorchBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 public final class AutoCompatDiscovery {
+    private static final Pattern TORCH_NAME_PATTERN = Pattern.compile("(^|_)torches?($|_)");
     private static final Set<Block> DISCOVERED_LINKABLE_BLOCKS = ConcurrentHashMap.newKeySet();
     private static volatile boolean discovered;
 
@@ -30,7 +34,7 @@ public final class AutoCompatDiscovery {
             }
 
             BlockState state = block.defaultBlockState();
-            if (!looksLikeLightSource(state)) {
+            if (!isTorchCandidate(block, id, state)) {
                 continue;
             }
 
@@ -39,18 +43,31 @@ public final class AutoCompatDiscovery {
         }
 
         discovered = true;
-        DuskLights.LOGGER.info("Auto-discovered {} modded light blocks for DuskLights compat linking.", discoveredCount);
+        DuskLights.LOGGER.info("Auto-discovered {} modded torch blocks for DuskLights compat linking.", discoveredCount);
     }
 
     public static boolean isDiscoveredLinkable(BlockState state) {
         return DISCOVERED_LINKABLE_BLOCKS.contains(state.getBlock());
     }
 
-    private static boolean looksLikeLightSource(BlockState state) {
-        if (state.getLightEmission() > 0) {
+    private static boolean isTorchCandidate(Block block, ResourceLocation id, BlockState state) {
+        if (!isTorchLikeBlock(block, id)) {
+            return false;
+        }
+
+        return state.getLightEmission() > 0 || hasControllableLightProperty(state);
+    }
+
+    private static boolean isTorchLikeBlock(Block block, ResourceLocation id) {
+        if (block instanceof TorchBlock || block instanceof WallTorchBlock) {
             return true;
         }
 
+        String path = id.getPath();
+        return TORCH_NAME_PATTERN.matcher(path).find();
+    }
+
+    private static boolean hasControllableLightProperty(BlockState state) {
         for (var property : state.getProperties()) {
             if (property instanceof IntegerProperty integerProperty) {
                 String name = integerProperty.getName();

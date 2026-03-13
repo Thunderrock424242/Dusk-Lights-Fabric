@@ -73,9 +73,10 @@ For many simple light blocks, only adding the block tag is enough.
 
 ## Auto-link behavior for modded items
 
-DuskLights performs a runtime discovery pass over loaded mod blocks and auto-links likely light blocks when players place the normal block item.
-You can still explicitly opt in with `dusklights:daylight_linkable` for guaranteed behavior.
-This means you usually do not need a separate `linked_*` item for compat.
+DuskLights performs a runtime discovery pass over loaded mod blocks and auto-links **torch-like** blocks (actual torch classes or ids containing `torch`) when players place the normal block item.
+This avoids broad false positives from unrelated mod blocks that merely expose `power`/`level` properties.
+You can still explicitly opt in with `dusklights:daylight_linkable` for guaranteed behavior on non-torch lights.
+This means you usually do not need a separate `linked_*` item for torch compat.
 
 If DuskLights cannot control a tagged block (for example, no compatible state property and helper light placement is blocked),
 it logs a compat error that includes the owning mod id and asks users to report it to that mod.
